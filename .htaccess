@@ -1,0 +1,5 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(?:src|views|vendor|tests|bin|build)(?:/|$) - [F,L]
+    RewriteRule ^(?:composer\.(?:json|lock)|phpunit\.xml(?:\.dist)?|README\.md)$ - [F,L]
+</IfModule>
