@@ -1,4 +1,4 @@
-import {initialize} from './runtime.js';
+import {initialize} from './runtime.js?ver=1.6.0.1';
 import {observeBackendActions} from './action-state.js?ver=1.4.0';
 
 const container = document.getElementById('wp-script-module-data-hachitech-hideguard');

@@ -23,19 +23,16 @@ abstract class AdapterTestCase extends TestCase
         $values = $settings->values();
         $values['enabled'] = true;
         $values['debugLogging'] = false;
-        $values['environment'] = 'development';
         $values['points'] = [];
         $values['paths'] = ['protected'];
         $values['passDuration'] = 300;
         $values['blockDuration'] = 3600;
-        foreach (['development', 'production'] as $environment) {
-            $values['keys'][$environment] = [
-                'endpointUrl' => 'https://hideguard.io',
-                'publicKey' => 'fixture-' . $environment,
-                'signaturePublicKey' => SignedPayload::pem(),
-                'apiKey' => '',
-            ];
-        }
+        $values['keys'] = [
+            'publicKey' => 'fixture-site',
+            'signaturePublicKey' => SignedPayload::pem(),
+            'apiKey' => '',
+            'removeApiKey' => false,
+        ];
         update_option(Settings::OPTION, $values);
     }
     protected function tearDown(): void

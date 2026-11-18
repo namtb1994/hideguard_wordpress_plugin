@@ -27,7 +27,7 @@ final class HttpTest extends HttpTestCase
         self::assertStringContainsString('wp-script-module-data-hachitech-hideguard', $home);
         $config = $this->pageConfig();
         self::assertArrayNotHasKey('signaturePublicKey', $config);
-        self::assertSame('https://dev.hideguard.io', $config['endpointUrl']);
+        self::assertSame('https://hideguard.io', $config['endpointUrl']);
         self::assertSame(400, $this->request('/wp-json/hachitech-hideguard/v1/check', [])[0]);
         self::assertSame(403, $this->request('/protected/', ['operation' => 'unsafe'])[0]);
         self::assertSame(413, $this->request('/wp-json/hachitech-hideguard/v1/check',
@@ -163,22 +163,17 @@ final class HttpTest extends HttpTestCase
         self::assertSame('verification_failed', json_decode($body, true)['status']);
     }
 
-    /** @dataProvider signedEnvironments */
-    public function testEveryEnvironmentRequiresAndAcceptsValidSignatures(string $environment): void
+    public function testLegacyEnvironmentAndEndpointCannotOverrideTheLiveSignedPolicy(): void
     {
         $values = (new Settings())->values();
-        $values['environment'] = $environment;
-        $values['keys'][$environment]['endpointUrl'] = 'https://sdk.example.test:8443';
+        $values['environment'] = 'development';
+        $values['keys']['endpointUrl'] = 'https://sdk.example.test:8443';
         update_option(Settings::OPTION, $values);
         $config = $this->pageConfig();
-        self::assertSame('fixture-' . $environment, $config['publicKey']);
-        self::assertSame(\Hachitechs\HideguardPhp\Configuration\ProtectionPolicy::defaultEndpointUrl($environment), $config['endpointUrl']);
-        self::assertSame(200, $this->verdict($config, SignedPayload::payload(environment: $environment))[0]);
-    }
-
-    public static function signedEnvironments(): array
-    {
-        return [['development'], ['production']];
+        self::assertSame('fixture-site', $config['publicKey']);
+        self::assertSame('https://hideguard.io', $config['endpointUrl']);
+        self::assertArrayNotHasKey('environment', $config);
+        self::assertSame(200, $this->verdict($config, SignedPayload::payload())[0]);
     }
 
     public function testAdminResetRequiresCapabilityAndCsrf(): void
@@ -192,7 +187,9 @@ final class HttpTest extends HttpTestCase
         ])[0]);
         [$status, $admin] = $this->request('/wp-admin/options-general.php?page=hachitech_hideguard');
         self::assertSame(200, $status);
-        self::assertSame(2, substr_count($admin, 'data-hachitech-environment='));
+        self::assertSame(0, substr_count($admin, 'data-hachitech-environment='));
+        self::assertStringNotContainsString('name="hachitech_hideguard[environment]"', $admin);
+        self::assertStringContainsString('https://hideguard.io/dashboard/', $admin);
         self::assertSame(1, preg_match(
             '#name="action" value="hachitech_hideguard_reset".*?name="_wpnonce" value="([^"]+)"#s',
             $admin, $match

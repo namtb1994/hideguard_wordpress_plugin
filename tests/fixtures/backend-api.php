@@ -7,7 +7,7 @@ if (!preg_match('/^hg_wp_test_[a-zA-Z0-9_]+$/D', DB_NAME)) {
     throw new RuntimeException('The HideGuard HTTP mock is restricted to test databases.');
 }
 add_filter('pre_http_request', static function ($preempt, array $args, string $url) {
-    if ($preempt !== false || !in_array($url, ['https://hideguard.io/api/v1/verdict', 'https://dev.hideguard.io/api/v1/verdict'], true)) {
+    if ($preempt !== false || $url !== 'https://hideguard.io/api/v1/verdict') {
         return $preempt;
     }
     $calls = get_option('hg_fixture_api_calls', []);

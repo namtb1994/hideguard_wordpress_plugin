@@ -2,77 +2,47 @@
 
 declare(strict_types=1);
 
+use Hachitechs\HideguardPhp\Access\AccessContext;
 use Hachitechs\HideguardPhp\Exceptions\GuardException;
+use Hachitechs\HideguardPhp\Guard;
+use Hachitechs\HideguardPhp\Verification\Ed25519Verifier;
 use Hachitechs\HideguardWordPress\Settings;
+use Hachitechs\HideguardWordPress\WpdbStorage;
 
 final class SettingsTest extends AdapterTestCase
 {
-    public function testDebugLoggingDefaultsOffAndNormalizesCheckboxOnRepeatedSanitization(): void
-    {
-        delete_option(Settings::OPTION);
-        $settings = new Settings();
-        self::assertFalse($settings->debugLogging());
-        $input = $settings->values();
-        $input['debugLogging'] = '1';
-        $values = $settings->sanitize($input);
-        self::assertTrue($values['debugLogging']);
-        self::assertSame($values, $settings->sanitize($values));
-        update_option(Settings::OPTION, $values);
-        self::assertTrue($settings->debugLogging());
-        ob_start();
-        $settings->field(['field' => 'debugLogging']);
-        $html = ob_get_clean();
-        self::assertStringContainsString('name="hachitech_hideguard[debugLogging]"', $html);
-        self::assertStringContainsString('checked=', $html);
-        unset($input['debugLogging']);
-        $values = $settings->sanitize($input);
-        self::assertFalse($values['debugLogging']);
-        self::assertSame($values, $settings->sanitize($values));
-        update_option(Settings::OPTION, $values);
-        self::assertFalse($settings->debugLogging());
-    }
-
-    public function testDefaultsMatchMagentoAndLegacyAccessPointsCannotNarrowProtection(): void
+    public function testDefaultsUseOneLiveProfileAndCannotNarrowAccessPoints(): void
     {
         delete_option(Settings::OPTION);
         $settings = new Settings();
         self::assertFalse($settings->policy()->enabled);
-        self::assertSame(['all_pages', 'complete_order'], $settings->policy()->accessPoints);
+        self::assertFalse($settings->debugLogging());
+        self::assertSame(Settings::POINTS, $settings->policy()->accessPoints);
+        self::assertSame('https://hideguard.io', $settings->policy()->endpointUrl);
         self::assertSame(3600, $settings->policy()->blockDuration);
         self::assertSame(300, $settings->policy()->passDuration);
+        self::assertArrayNotHasKey('environment', $settings->values());
         $values = $settings->values();
         $values['points'] = [];
-        update_option(Settings::OPTION, $values);
-        self::assertSame(Settings::POINTS, $settings->policy()->accessPoints);
+        self::assertSame(Settings::POINTS, $settings->policy($values)->accessPoints);
     }
 
-    public function testSettingsApiNormalizesProfilesAndCanSanitizeTwice(): void
+    public function testSanitizeNormalizesPathsAndIsIdempotent(): void
     {
         $settings = new Settings();
         $input = $settings->values();
         $input['paths'] = "protected\n custom/* ";
         $input['passDuration'] = '0';
         $input['blockDuration'] = '900';
-        $input['keys']['production']['endpointUrl'] = 'https://hideguard.example.test:8443/';
         $values = $settings->sanitize($input);
         self::assertSame(['protected', 'custom/*'], $values['paths']);
         self::assertSame(0, $values['passDuration']);
+        self::assertSame(900, $values['blockDuration']);
         self::assertSame($values, $settings->sanitize($values));
-        self::assertSame(
-            'https://hideguard.io',
-            $settings->policy(array_replace($values, ['environment' => 'production']))->endpointUrl
-        );
-        ob_start();
-        $settings->field(['field' => 'keys']);
-        $html = ob_get_clean();
-        self::assertSame(2, substr_count($html, '<fieldset'));
-        self::assertSame(1, substr_count($html, 'hidden'));
-        self::assertSame(2, substr_count($html, '<textarea'));
-        self::assertSame(0, substr_count($html, 'type="url"'));
     }
 
     /** @dataProvider invalidSettings */
-    public function testRejectsInvalidSettingsWithoutReplacingSavedValues(string $field, mixed $value): void
+    public function testInvalidSettingsDoNotReplaceSavedValues(string $field, mixed $value): void
     {
         $settings = new Settings();
         $saved = $settings->values();
@@ -84,126 +54,219 @@ final class SettingsTest extends AdapterTestCase
     public static function invalidSettings(): array
     {
         return [
-            ['environment', 'unknown'], ['environment', 'staging'],
             ['passDuration', -1], ['passDuration', 30], ['blockDuration', 'bad'],
-            ['paths', implode("\n", array_fill(0, 51, 'custom/*'))],
+            ['paths', implode("\n", array_fill(0, 51, 'custom/*'))], ['paths', [['invalid']]],
         ];
     }
 
-    public function testDevelopmentCannotEnableWithoutSignatureKeyAndLegacyUrlsAreIgnored(): void
+    public function testEnabledProtectionRequiresSiteAndSignatureKeys(): void
     {
         $settings = new Settings();
         $saved = $settings->values();
-        $input = $saved;
-        $input['keys']['development']['signaturePublicKey'] = '';
-        self::assertSame($saved, $settings->sanitize($input));
-        $input = $saved;
-        $input['keys']['staging']['endpointUrl'] = 'http://hideguard.io/path';
-        self::assertSame($saved, $settings->sanitize($input));
-        $this->expectException(GuardException::class);
-        $settings->policy(array_replace($saved, ['keys' => [
-            'development' => ['publicKey' => 'key', 'signaturePublicKey' => 'not-an-ed25519-pem'],
-        ]]));
-    }
-
-    public function testBlankOrMissingApiKeysPreserveSavedSecretsAcrossProfiles(): void
-    {
-        $settings = new Settings();
-        $saved = $settings->values();
-        foreach (['development', 'production'] as $environment) {
-            $saved['keys'][$environment]['apiKey'] = 'secret-' . $environment;
+        foreach (['publicKey', 'signaturePublicKey'] as $key) {
+            $input = $saved;
+            $input['keys'][$key] = '';
+            self::assertSame($saved, $settings->sanitize($input));
         }
-        update_option(Settings::OPTION, $saved);
         $input = $saved;
-        $input['keys']['development']['apiKey'] = '';
-        unset($input['keys']['production']['apiKey']);
-        $values = $settings->sanitize($input);
-        self::assertSame($saved, $values);
-        self::assertSame($values, $settings->sanitize($values));
+        $input['keys']['signaturePublicKey'] = 'invalid-pem';
+        $this->expectException(GuardException::class);
+        $settings->policy($input);
     }
 
-    public function testApiKeyRemovalRemainsRemovedOnSecondSanitization(): void
+    public function testBlankAndMissingApiKeyRetainSecretAndRemovalIsIdempotent(): void
     {
         $settings = new Settings();
         $saved = $settings->values();
-        $saved['keys']['development']['apiKey'] = 'existing-secret';
+        $saved['keys']['apiKey'] = 'saved-secret';
         update_option(Settings::OPTION, $saved);
-        $input = $saved;
-        $input['keys']['development']['apiKey'] = '';
-        $input['keys']['development']['removeApiKey'] = '1';
-        $values = $settings->sanitize($input);
-        self::assertSame('', $values['keys']['development']['apiKey']);
-        self::assertSame($values, $settings->sanitize($values));
-        update_option(Settings::OPTION, $values);
+        foreach ([true, false] as $missing) {
+            $input = $saved;
+            $input['keys']['apiKey'] = '';
+            if ($missing) {
+                unset($input['keys']['apiKey']);
+            }
+            self::assertSame($saved, $settings->sanitize($input));
+        }
+        $input['keys']['removeApiKey'] = '1';
+        $removed = $settings->sanitize($input);
+        self::assertSame('', $removed['keys']['apiKey']);
+        self::assertSame($removed, $settings->sanitize($removed));
+        update_option(Settings::OPTION, $removed);
         self::assertSame('', $settings->apiKey());
         self::assertFalse($settings->backendEnabled());
     }
 
-    public function testNewApiKeyReplacesSavedSecretAndAllowsMaximumLength(): void
+    public function testNewApiKeyAllowsMaximumLengthAndCanBeReplaced(): void
     {
         $settings = new Settings();
         $input = $settings->values();
-        $input['keys']['development']['apiKey'] = str_repeat('a', 4096);
+        $input['keys']['apiKey'] = str_repeat('a', 4096);
         $values = $settings->sanitize($input);
-        self::assertSame($input['keys']['development']['apiKey'], $values['keys']['development']['apiKey']);
+        self::assertSame($input['keys']['apiKey'], $values['keys']['apiKey']);
         self::assertSame($values, $settings->sanitize($values));
         update_option(Settings::OPTION, $values);
-        $input = $values;
-        $input['keys']['development']['apiKey'] = 'replacement-secret';
-        self::assertSame('replacement-secret', $settings->sanitize($input)['keys']['development']['apiKey']);
+        $input['keys']['apiKey'] = 'replacement-secret';
+        self::assertSame('replacement-secret', $settings->sanitize($input)['keys']['apiKey']);
     }
 
     /** @dataProvider invalidApiKeys */
-    public function testInvalidDormantApiKeysDoNotReplaceSavedSettings(mixed $key): void
+    public function testInvalidApiKeysDoNotReplaceSavedSettings(mixed $key): void
     {
         $settings = new Settings();
         $saved = $settings->values();
         $input = $saved;
-        $input['keys']['production']['apiKey'] = $key;
+        $input['keys']['apiKey'] = $key;
         self::assertSame($saved, $settings->sanitize($input));
     }
 
     public static function invalidApiKeys(): array
     {
-        return [
-            ['invalid key'], ["invalid\nkey"], ["invalid\x7fkey"], [str_repeat('a', 4097)], [['invalid']],
-        ];
+        return [['invalid key'], ["invalid\nkey"], ["invalid\x7fkey"], [str_repeat('a', 4097)], [['invalid']]];
     }
 
-    public function testBackendActivationFollowsActiveEnvironmentAndGlobalEnable(): void
+    public function testBackendActivationFollowsTheOnlyApiKeyAndGlobalEnable(): void
     {
         $settings = new Settings();
-        self::assertSame('', $settings->apiKey());
         self::assertFalse($settings->backendEnabled());
         $values = $settings->values();
-        $values['keys']['production']['apiKey'] = 'production-secret';
+        $values['keys']['apiKey'] = 'live-secret';
         update_option(Settings::OPTION, $values);
-        self::assertFalse($settings->backendEnabled());
-        $values['environment'] = 'production';
-        update_option(Settings::OPTION, $values);
-        self::assertSame('production-secret', $settings->apiKey());
         self::assertTrue($settings->backendEnabled());
+        self::assertSame('live-secret', $settings->apiKey());
         $values['enabled'] = false;
         update_option(Settings::OPTION, $values);
         self::assertFalse($settings->backendEnabled());
     }
 
-    public function testApiKeyFieldsNeverExposeSavedSecrets(): void
+    public function testSettingsHaveNoEnvironmentSelectorAndLinkToDashboardWithoutExposingSecret(): void
     {
         $settings = new Settings();
         $values = $settings->values();
-        $values['keys']['development']['apiKey'] = 'development-private-secret';
-        $values['keys']['production']['apiKey'] = 'production-private-secret';
+        $values['keys']['apiKey'] = 'private-DO-NOT-RENDER';
         update_option(Settings::OPTION, $values);
+        $settings->register();
+        remove_filter('sanitize_option_' . Settings::OPTION, [$settings, 'sanitize']);
+        global $wp_settings_fields;
+        self::assertArrayNotHasKey('environment', $wp_settings_fields[Settings::OPTION]['protection']);
         ob_start();
         $settings->field(['field' => 'keys']);
         $html = ob_get_clean();
-        self::assertStringNotContainsString('development-private-secret', $html);
-        self::assertStringNotContainsString('production-private-secret', $html);
-        self::assertSame(2, substr_count($html, 'type="password" autocomplete="new-password"'));
-        self::assertSame(2, substr_count($html, 'value="" placeholder="'));
-        self::assertSame(2, substr_count($html, 'Configured; leave blank to keep'));
-        self::assertSame(0, substr_count($html, 'Not configured'));
-        self::assertSame(2, substr_count($html, '[removeApiKey]'));
+        self::assertStringNotContainsString('private-DO-NOT-RENDER', $html);
+        self::assertSame(1, substr_count($html, '<fieldset'));
+        self::assertSame(1, substr_count($html, 'type="password"'));
+        self::assertSame(1, substr_count($html, '[removeApiKey]'));
+        self::assertStringNotContainsString('data-hachitech-environment', $html);
+        self::assertStringContainsString('href="https://hideguard.io/dashboard/"', $html);
+        self::assertStringContainsString('rel="noopener noreferrer"', $html);
+        self::assertStringContainsString('value="" placeholder="', $html);
+    }
+
+    /** @dataProvider legacyProfiles */
+    public function testLegacyActiveKeysArePreservedWithoutWritingDuringRead(string $selected): void
+    {
+        $settings = new Settings();
+        $saved = $settings->values();
+        $saved['environment'] = $selected;
+        $saved['keys'] = [];
+        foreach (['development', 'staging', 'production'] as $profile) {
+            $saved['keys'][$profile] = [
+                'publicKey' => 'site-' . $profile,
+                'signaturePublicKey' => SignedPayload::pem(),
+                'apiKey' => 'secret-' . $profile,
+            ];
+        }
+        update_option(Settings::OPTION, $saved);
+        $values = $settings->values();
+        self::assertSame($saved, get_option(Settings::OPTION));
+        self::assertArrayNotHasKey('environment', $values);
+        self::assertSame('site-' . $selected, $values['keys']['publicKey']);
+        self::assertSame('secret-' . $selected, $settings->apiKey());
+        self::assertSame($saved['keys'], $values['legacyProfiles']);
+        ob_start();
+        $settings->field(['field' => 'keys']);
+        $html = ob_get_clean();
+        foreach (['development', 'staging', 'production'] as $profile) {
+            self::assertStringNotContainsString('secret-' . $profile, $html);
+        }
+        self::assertSame('https://hideguard.io', $settings->policy()->endpointUrl);
+        $input = $values;
+        $input['keys']['apiKey'] = '';
+        $values = $settings->sanitize($input);
+        update_option(Settings::OPTION, $values);
+        self::assertSame('secret-' . $selected, $settings->apiKey());
+        self::assertSame($saved['keys'], $settings->values()['legacyProfiles']);
+        self::assertSame($values, $settings->sanitize($values));
+    }
+
+    public static function legacyProfiles(): array
+    {
+        return [['development'], ['staging'], ['production']];
+    }
+
+    public function testRemoveAlsoClearsApiSecretsFromLegacyRecoveryMetadata(): void
+    {
+        $settings = new Settings();
+        $saved = $settings->values();
+        $saved['keys']['apiKey'] = 'current-secret';
+        $saved['legacyProfiles'] = [
+            'development' => ['apiKey' => 'old-secret', 'publicKey' => 'public-site'],
+            'production' => ['apiKey' => 'current-secret'],
+        ];
+        update_option(Settings::OPTION, $saved);
+        $input = $settings->values();
+        $input['keys']['apiKey'] = '';
+        $input['keys']['removeApiKey'] = true;
+        $removed = $settings->sanitize($input);
+        self::assertSame('', $removed['keys']['apiKey']);
+        foreach ($removed['legacyProfiles'] as $profile) {
+            self::assertSame('', $profile['apiKey']);
+        }
+        self::assertSame('public-site', $removed['legacyProfiles']['development']['publicKey']);
+        self::assertSame($removed, $settings->sanitize($removed));
+    }
+
+    public function testMissingLegacyActiveProfileDoesNotSelectAnotherProfilesSecrets(): void
+    {
+        $settings = new Settings();
+        $saved = $settings->values();
+        $saved['environment'] = 'unknown';
+        $saved['keys'] = ['production' => $saved['keys']];
+        update_option(Settings::OPTION, $saved);
+        self::assertSame('', $settings->values()['keys']['publicKey']);
+        self::assertSame($saved, get_option(Settings::OPTION));
+        $this->expectException(GuardException::class);
+        $settings->policy();
+    }
+
+    public function testPostedEnvironmentAndProfilesCannotReplaceFlatKeysOrEndpoint(): void
+    {
+        $settings = new Settings();
+        $saved = $settings->values();
+        $input = $saved;
+        $input['environment'] = 'staging';
+        $input['keys']['staging'] = ['apiKey' => 'injected'];
+        $input['keys']['endpointUrl'] = 'https://invalid.example';
+        $input['endpointUrl'] = 'https://invalid.example';
+        self::assertSame($saved, $settings->sanitize($input));
+        self::assertSame($settings->policy()->fingerprint(), $settings->policy($input)->fingerprint());
+    }
+
+    public function testDebugOnlyMigrationSaveKeepsAnExistingGrant(): void
+    {
+        $settings = new Settings();
+        $saved = $settings->values();
+        $saved['environment'] = 'production';
+        $saved['keys'] = ['production' => $saved['keys']];
+        update_option(Settings::OPTION, $saved);
+        $guard = Guard::factory()->withStorage(WpdbStorage::forSite())->withVerifier(new Ed25519Verifier())->make();
+        $context = new AccessContext((string)get_current_blog_id(), 'settings-migration');
+        $policy = $settings->policy();
+        $attempt = $guard->preflight($context, $policy);
+        $guard->report($context, $policy, SignedPayload::payload(), $attempt->verificationId);
+        $input = $settings->values();
+        $input['debugLogging'] = true;
+        update_option(Settings::OPTION, $settings->sanitize($input));
+        self::assertSame('allowed', $guard->inspect($context, $policy)->status);
     }
 }

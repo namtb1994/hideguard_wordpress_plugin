@@ -20,12 +20,11 @@ before(async()=>{
         $settings = new Hachitechs\HideguardWordPress\Settings();
         $values = $settings->values();
         $values['enabled'] = true;
-        $values['environment'] = 'development';
         $values['paths'] = ['protected'];
         $values['points'] = [];
         $values['passDuration'] = 300;
-        $values['keys']['development'] = [
-            'endpointUrl'=>'https://dev.hideguard.io', 'publicKey'=>'fixture-site',
+        $values['keys'] = [
+            'endpointUrl'=>'https://hideguard.io', 'publicKey'=>'fixture-site',
             'signaturePublicKey'=>SignedPayload::pem(), 'apiKey'=>'',
         ];
         update_option(Hachitechs\HideguardWordPress\Settings::OPTION, $values);
@@ -47,7 +46,7 @@ async function pageFixture(t,{baseline=false}={}){
     let release;
     let confirmation;
     const permit=new Promise(resolve=>{release=resolve;});
-    await page.route('https://dev.hideguard.io/sdk/v1.js',route=>route.fulfill({contentType:'text/javascript',
+    await page.route('https://hideguard.io/sdk/v1.js',route=>route.fulfill({contentType:'text/javascript',
         body:`setTimeout(()=>window.dispatchEvent(new CustomEvent('fpc:verdict',{detail:${JSON.stringify(payload)}})),150);`}));
     await page.route('**/hachitech-hideguard/v1/verdict',async route=>{
         confirmation=route;

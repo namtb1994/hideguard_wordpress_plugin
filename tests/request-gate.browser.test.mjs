@@ -95,13 +95,14 @@ async function fixture(t, {manual = false, maxWaitMs = 45000, realSdk = false} =
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const origin = 'http://127.0.0.1:' + server.address().port;
-    const page = await browser.newPage();
+    const context = await browser.newContext();
+    const page = await context.newPage();
     await page.route(sdkOrigin + '/**', async route => {
         const response = await route.fetch({url: sdkHttp + new URL(route.request().url()).pathname});
         await route.fulfill({response});
     });
     t.after(async () => {
-        await page.close();
+        await context.close();
         server.closeAllConnections(); sdk.closeAllConnections();
         await Promise.all([new Promise(resolve => server.close(resolve)), new Promise(resolve => sdk.close(resolve))]);
     });
@@ -187,6 +188,20 @@ test('Block cancels queued calls before sending and navigates through the existi
     });
     await f.settle('blocked'); await f.page.waitForURL('**/gate');
     for(const path of ['/blocked-fetch','/blocked-xhr','/blocked-jquery']) assert.equal(starts(f.requests,path),0);
+});
+
+test('A backend Block sends both tabs to the gate', async t => {
+    const f = await fixture(t);
+    const peer = await f.page.context().newPage();
+    await peer.route(f.origin + '/verify', route => route.fulfill({json: {
+        status: 'allowed', allowed: true, expiresAt: Date.now() + 60000, passDuration: 300,
+    }}));
+    await peer.goto(f.origin);
+    await peer.waitForFunction(() => window.HideGuardAccess?.getState().status === 'allowed');
+
+    await f.settle('blocked');
+    await Promise.all([f.page.waitForURL('**/gate'), peer.waitForURL('**/gate')]);
+    assert.equal(starts(f.requests, '/verdict'), 1);
 });
 
 test('XHR and jQuery timeouts begin after release and still fire once for a slow server', async t=>{

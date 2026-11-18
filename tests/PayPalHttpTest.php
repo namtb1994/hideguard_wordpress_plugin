@@ -13,7 +13,7 @@ final class PayPalHttpTest extends HttpTestCase
     {
         parent::setUp();
         $values = (new Settings())->values();
-        $values['keys']['development']['apiKey'] = 'fixture-backend-secret';
+        $values['keys']['apiKey'] = 'fixture-backend-secret';
         $values['points'] = ['complete_order'];
         update_option(Settings::OPTION, $values);
         update_option('hg_fixture_paypal_enabled', true);
@@ -79,7 +79,7 @@ final class PayPalHttpTest extends HttpTestCase
         self::assertSame(1, $this->calls('hg_fixture_paypal_calls'));
     }
 
-    public function testDraftReadFirstCanPassItsVerdictToPaypalAndTheLaterStoreCheckout(): void
+    public function testCheckoutReadFirstCanPassItsVerdictToPaypalAndTheLaterStoreCheckout(): void
     {
         [, , $headers] = $this->request('/wp-json/wc/store/cart');
         $nonce = '';
@@ -93,7 +93,16 @@ final class PayPalHttpTest extends HttpTestCase
         $draft = json_decode($body, true)['order_id'];
         self::assertSame(1, $this->calls('hg_fixture_api_calls'));
         self::assertSame(200, $this->paypal('create')[0]);
-        self::assertSame($draft, $this->checkout('store'));
+        $beforeCheckout = $this->orderCount();
+        $orderId = $this->checkout('store');
+        self::assertGreaterThan(0, $orderId);
+        if ($draft > 0) {
+            self::assertSame($draft, $orderId);
+            self::assertSame($beforeCheckout, $this->orderCount());
+        } else {
+            // WooCommerce 11.2 defers creating a draft until POST; checkout GET returns order_id=0.
+            self::assertSame($beforeCheckout + 1, $this->orderCount());
+        }
         self::assertSame(1, $this->calls('hg_fixture_api_calls'));
     }
 

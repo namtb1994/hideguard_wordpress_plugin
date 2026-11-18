@@ -43,17 +43,6 @@ final class Plugin
                 . '">' . esc_html__('Settings', 'hachitechs-hideguard') . '</a>');
             return $links;
         });
-        add_action('admin_enqueue_scripts', function (string $hook): void {
-            if ($hook === 'settings_page_' . Settings::OPTION) {
-                wp_enqueue_script(
-                    'hachitech-hideguard-admin',
-                    plugins_url('assets/admin.js', $this->file),
-                    [],
-                    '1.5.0',
-                    true
-                );
-            }
-        });
         add_action('template_redirect', [$this, 'protectRequest'], -100);
         add_action('wp_head', [$this, 'networkBootstrap'], PHP_INT_MIN);
         add_action('login_head', [$this, 'networkBootstrap'], PHP_INT_MIN);
@@ -70,11 +59,10 @@ final class Plugin
         add_action('update_option_' . Settings::OPTION, function (mixed $old, mixed $new): void {
             if (is_array($old) && is_array($new)) {
                 foreach ([$old, $new] as $index => $values) {
-                    unset($values['debugLogging']);
-                    // Removal intent is a Settings API form detail; the saved key itself controls protection.
-                    foreach (array_keys($values['keys'] ?? []) as $environment) {
-                        unset($values['keys'][$environment]['removeApiKey']);
-                    }
+                    $values = $this->services->settings->values($values);
+                    unset($values['debugLogging'], $values['legacyProfiles']);
+                    // Removal intent is a form detail; only the saved key changes protection.
+                    unset($values['keys']['removeApiKey']);
                     if ($index === 0) {
                         $old = $values;
                     } else {
@@ -339,8 +327,8 @@ final class Plugin
         if (!$this->loadRuntime) {
             return;
         }
-        wp_enqueue_script_module('hachitech-hideguard', plugins_url('assets/access.js', $this->file), [], '1.5.0');
-        wp_register_style('hachitech-hideguard', false, [], '1.5.0');
+        wp_enqueue_script_module('hachitech-hideguard', plugins_url('assets/access.js', $this->file), [], '1.6.0.1');
+        wp_register_style('hachitech-hideguard', false, [], '1.6.0');
         wp_enqueue_style('hachitech-hideguard');
         wp_add_inline_style('hachitech-hideguard', json_decode((string)file_get_contents(
             dirname(__DIR__) . '/assets/runtime.styles.json'

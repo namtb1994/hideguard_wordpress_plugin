@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Hachitech Hideguard
  * Description: HideGuard page and WooCommerce protection with server-verified Ed25519 verdicts.
- * Version: 1.5.0
+ * Version: 1.6.0
  * Requires at least: 6.9
  * Requires PHP: 8.1
  * Text Domain: hachitechs-hideguard

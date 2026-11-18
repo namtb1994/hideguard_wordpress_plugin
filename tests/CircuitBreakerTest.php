@@ -40,13 +40,13 @@ final class CircuitBreakerTest extends AdapterTestCase
         );
         for ($i = 0; $i < 100; $i++) {
             try {
-                $guarded->post('https://dev.hideguard.io/api/v1/verdict', ['x-api-key' => 'secret-a'], '{}');
+                $guarded->post('https://hideguard.io/api/v1/verdict', ['x-api-key' => 'secret-a'], '{}');
             } catch (ApiException $error) {
                 self::assertSame(503, $error->statusCode);
             }
         }
         self::assertSame(5, $transport->calls);
-        $guarded->post('https://dev.hideguard.io/api/v1/verdict', ['x-api-key' => 'secret-b'], '{}');
+        $guarded->post('https://hideguard.io/api/v1/verdict', ['x-api-key' => 'secret-b'], '{}');
         self::assertSame(6, $transport->calls);
     }
 
@@ -111,7 +111,7 @@ final class CircuitBreakerTest extends AdapterTestCase
     {
         $settings = new Settings();
         $values = $settings->values();
-        $values['keys']['development']['apiKey'] = 'fixture-circuit-secret';
+        $values['keys']['apiKey'] = 'fixture-circuit-secret';
         update_option(Settings::OPTION, $values);
         $services = new Services($settings, new Identity());
         $context = $services->identity->context();

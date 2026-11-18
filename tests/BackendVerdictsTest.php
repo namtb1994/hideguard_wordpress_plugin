@@ -26,8 +26,8 @@ final class BackendVerdictsTest extends AdapterTestCase
         parent::setUp();
         $settings = new Settings();
         $values = $settings->values();
-        $values['keys']['development']['apiKey'] = 'fixture-secret';
-        $values['keys']['development']['removeApiKey'] = false;
+        $values['keys']['apiKey'] = 'fixture-secret';
+        $values['keys']['removeApiKey'] = false;
         update_option(Settings::OPTION, $values);
         $this->services = new Services($settings, new Identity());
         $this->originalPost = $_POST;
@@ -138,7 +138,7 @@ final class BackendVerdictsTest extends AdapterTestCase
             'missing visitor' => [self::http('{"verdict":"allow","score":0,"reasons":[]}')],
             'different visitor' => $invalid(['visitorId' => 'other-visitor']),
             'unknown verdict' => $invalid(['verdict' => 'unknown']),
-            'different environment' => $invalid(['environment' => 'production']),
+            'different environment' => $invalid(['environment' => 'staging']),
             'unexpected envelope' => [self::http('{"data":{"verdict":"block","visitorId":"fixture-visitor"}}')],
             'missing score' => [self::http('{"visitorId":"fixture-visitor","verdict":"allow","reasons":[]}')],
             'negative score' => $invalid(['score' => -1]),
@@ -166,7 +166,7 @@ final class BackendVerdictsTest extends AdapterTestCase
             $state->verification = 'unverified_test_mode';
             $storage->saveSession($context->scopeId, $state);
         });
-        self::assertInstanceOf(GuardException::class,
+        self::assertInstanceOf(ActionDenied::class,
             $this->denied(fn() => $this->services->backend()->assertAllowed('login')));
         self::assertCount(0, $this->requests);
     }
@@ -183,7 +183,7 @@ final class BackendVerdictsTest extends AdapterTestCase
         $this->services->backend()->assertAllowed('login');
         self::assertCount(1, $this->requests);
         [$url, $args] = $this->requests[0];
-        self::assertSame('https://dev.hideguard.io/api/v1/verdict', $url);
+        self::assertSame('https://hideguard.io/api/v1/verdict', $url);
         self::assertSame(['visitorId' => 'fixture-visitor'], json_decode($args['body'], true));
         self::assertSame('fixture-secret', $args['headers']['x-api-key']);
         self::assertSame('application/json', $args['headers']['Content-Type']);
@@ -466,7 +466,7 @@ final class BackendVerdictsTest extends AdapterTestCase
         $this->services->backend()->consumeOrder($resource, 701);
         $values = $this->services->settings->values();
         if ($change === 'apiKey') {
-            $values['keys']['development']['apiKey'] = 'replacement-fixture-secret';
+            $values['keys']['apiKey'] = 'replacement-fixture-secret';
         } else {
             $values['passDuration'] = 60;
         }
@@ -485,7 +485,7 @@ final class BackendVerdictsTest extends AdapterTestCase
     {
         $values = $this->services->settings->values();
         $values['environment'] = 'production';
-        $values['keys']['production']['apiKey'] = 'production-fixture-secret';
+        $values['keys']['apiKey'] = 'production-fixture-secret';
         update_option(Settings::OPTION, $values);
         $context = $this->services->identity->context();
         $policy = $this->services->settings->policy();

@@ -10,7 +10,7 @@ final class BackendHttpTest extends HttpTestCase
     {
         parent::setUp();
         $values = (new Settings())->values();
-        $values['keys']['development']['apiKey'] = 'fixture-backend-secret';
+        $values['keys']['apiKey'] = 'fixture-backend-secret';
         $values['points'] = [];
         update_option(Settings::OPTION, $values);
         update_option('woocommerce_enable_signup_and_login_from_checkout', 'yes');

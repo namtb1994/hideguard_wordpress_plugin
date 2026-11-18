@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fdea993de5e5fdf204197a9bfe562834",
+    "content-hash": "9753f7bcf66422ae09f29761f531e5fa",
     "packages": [
         {
             "name": "hachitechs/hideguard-php",
-            "version": "v1.0.0",
+            "version": "v1.0.2",
             "source": {
                 "type": "git",
-                "url": "git@github.com:namtb1994/hachitechs-hideguard-php.git",
-                "reference": "3f31472f6301d1b5c5283f67c91057ab539f0397"
+                "url": "https://github.com/namtb1994/hachitechs-hideguard-php.git",
+                "reference": "89a2e75205fa0672c71f50ecd1f09240a907fd77"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/namtb1994/hachitechs-hideguard-php/zipball/3f31472f6301d1b5c5283f67c91057ab539f0397",
-                "reference": "3f31472f6301d1b5c5283f67c91057ab539f0397",
+                "url": "https://api.github.com/repos/namtb1994/hachitechs-hideguard-php/zipball/89a2e75205fa0672c71f50ecd1f09240a907fd77",
+                "reference": "89a2e75205fa0672c71f50ecd1f09240a907fd77",
                 "shasum": ""
             },
             "require": {
@@ -41,49 +41,26 @@
                     "Hachitechs\\HideguardPhp\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Hachitechs\\HideguardPhp\\Tests\\": "tests/"
-                }
-            },
-            "archive": {
-                "exclude": [
-                    "/vendor",
-                    "/tests",
-                    "/.github",
-                    "/.phpstan-cache",
-                    "/.phpunit.result.cache",
-                    "/composer.lock",
-                    "/phpunit.xml.dist",
-                    "/phpstan.neon.dist",
-                    "/browser/node_modules",
-                    "/browser/src",
-                    "/browser/build.mjs",
-                    "/browser/publish-magento.mjs",
-                    "/browser/package.json",
-                    "/browser/package-lock.json"
-                ]
-            },
-            "scripts": {
-                "test": [
-                    "phpunit"
-                ],
-                "analyse": [
-                    "phpstan analyse"
-                ],
-                "lint": [
-                    "phpcs --standard=PSR12 src tests examples"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "proprietary"
             ],
-            "description": "Framework independent HideGuard access protection for PHP",
+            "description": "PHP SDK for HideGuard bot protection, signed verdict verification, and checkout access control.",
+            "keywords": [
+                "Ed25519",
+                "access-control",
+                "bot-protection",
+                "bot-verification",
+                "checkout-protection",
+                "hideguard",
+                "php"
+            ],
             "support": {
-                "source": "https://github.com/namtb1994/hachitechs-hideguard-php/tree/v1.0.0",
-                "issues": "https://github.com/namtb1994/hachitechs-hideguard-php/issues"
+                "issues": "https://github.com/namtb1994/hachitechs-hideguard-php/issues",
+                "source": "https://github.com/namtb1994/hachitechs-hideguard-php/tree/v1.0.2"
             },
-            "time": "2026-11-07T08:44:51+00:00"
+            "time": "2026-11-17T09:39:39+00:00",
+            "published-time": "2026-11-17T09:41:10+00:00"
         },
         {
             "name": "psr/clock",

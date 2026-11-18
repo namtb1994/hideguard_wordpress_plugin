@@ -35,7 +35,7 @@ foreach (['hachitechs-hideguard.php', '.htaccess', 'README.md', 'composer.json',
 }
 $run(['composer', 'install', '--no-dev', '--no-interaction', '--no-progress',
     '--no-scripts', '--no-plugins', '--optimize-autoloader'], $staging);
-// A private dist can fall back to a Git checkout. Honor the core's own archive exclusions.
+// Source installs can fall back to a Git checkout. Honor the core's own archive exclusions.
 $core = $staging . '/vendor/hachitechs/hideguard-php';
 $archiveDirectory = $staging . '/core-archive';
 mkdir($archiveDirectory);
@@ -52,7 +52,7 @@ if (!$archive->extractTo($core)) {
 $archive->close();
 unlink($archiveDirectory . '/core.zip');
 rmdir($archiveDirectory);
-$destination = $root . '/build/hachitechs-hideguard-1.5.0.zip';
+$destination = $root . '/build/hachitechs-hideguard-1.6.0.zip';
 $zip = new ZipArchive();
 if ($zip->open($destination, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
     throw new RuntimeException('Unable to create plugin ZIP.');

@@ -23,7 +23,7 @@ final class SignedPayload
     public static function payload(
         string $verdict = 'allow',
         string $visitor = 'fixture-visitor',
-        string $environment = 'development',
+        string $environment = 'production',
         ?int $issuedAt = null
     ): array {
         $issuedAt ??= time();

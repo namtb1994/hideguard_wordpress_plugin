@@ -46,39 +46,28 @@ final class RuntimeSettingsTest extends AdapterTestCase
         $values = $settings->values();
         $before = $settings->policy($values);
         $values['points'] = ['cart'];
-        $values['keys']['development']['endpointUrl'] = 'https://untrusted.example';
+        $values['keys']['endpointUrl'] = 'https://untrusted.example';
         $values['limits'] = ['scope_requests' => 999999];
         $values['circuit'] = ['enabled' => false];
         $policy = $settings->policy($values);
         self::assertSame($before->fingerprint(), $policy->fingerprint());
         self::assertSame(Settings::POINTS, $policy->accessPoints);
-        self::assertSame('https://dev.hideguard.io', $policy->endpointUrl);
+        self::assertSame('https://hideguard.io', $policy->endpointUrl);
         self::assertEquals(new RateLimits(), $policy->limits);
         $sanitized = $settings->sanitize($values);
         self::assertSame($before->fingerprint(), $settings->policy($sanitized)->fingerprint());
     }
 
-    public function testLegacyStagingRequiresExplicitMigrationAndKeepsItsCredentials(): void
+    public function testPostedEnvironmentCannotSelectAnotherEndpoint(): void
     {
         $settings = new Settings();
+        $before = $settings->policy();
         $values = $settings->values();
         $values['environment'] = 'staging';
-        $values['keys']['staging'] = ['apiKey' => 'legacy-secret'];
-        update_option(Settings::OPTION, $values);
-        try {
-            $settings->policy();
-            self::fail('Legacy staging must not silently switch credentials or host.');
-        } catch (GuardException) {
-            self::assertSame('legacy-secret', get_option(Settings::OPTION)['keys']['staging']['apiKey']);
-        }
-        $values['environment'] = 'development';
-        $values = $settings->sanitize($values);
-        self::assertSame('legacy-secret', $values['keys']['staging']['apiKey']);
-        self::assertSame('development', $values['environment']);
-        ob_start();
-        $settings->field(['field' => 'environment']);
-        $html = ob_get_clean();
-        self::assertStringNotContainsString('value="staging"', $html);
-        self::assertSame(2, substr_count($html, '<option'));
+        $values['endpointUrl'] = 'https://invalid.example';
+        $values['keys']['endpointUrl'] = 'https://invalid.example';
+        self::assertSame($before->fingerprint(), $settings->policy($values)->fingerprint());
+        self::assertArrayNotHasKey('environment', $settings->sanitize($values));
+        self::assertSame('https://hideguard.io', $settings->policy($values)->endpointUrl);
     }
 }

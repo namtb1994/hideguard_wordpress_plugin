@@ -23,7 +23,7 @@ final class PayPalOrdersTest extends AdapterTestCase
     {
         parent::setUp();
         $values = (new Settings())->values();
-        $values['keys']['development']['apiKey'] = 'fixture-secret';
+        $values['keys']['apiKey'] = 'fixture-secret';
         update_option(Settings::OPTION, $values);
         $this->originalPost = $_POST;
         $_POST = [];
@@ -87,7 +87,7 @@ final class PayPalOrdersTest extends AdapterTestCase
             WC()->cart->applied_coupons = ['different-coupon'];
         } elseif ($change === 'key') {
             $values = (new Settings())->values();
-            $values['keys']['development']['apiKey'] = 'changed-secret';
+            $values['keys']['apiKey'] = 'changed-secret';
             update_option(Settings::OPTION, $values);
         } else {
             $storage->run($context->scopeId, function () use ($storage, $context, $change): void {

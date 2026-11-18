@@ -26,7 +26,7 @@ final class VerdictDebugLogTest extends AdapterTestCase
         parent::setUp();
         $this->services = new Services(new Settings(), new Identity());
         $values = $this->services->settings->values();
-        $values['keys']['development']['apiKey'] = 'private-api-key-DO-NOT-LOG';
+        $values['keys']['apiKey'] = 'private-api-key-DO-NOT-LOG';
         update_option(Settings::OPTION, $values);
         $this->logFile = tempnam(sys_get_temp_dir(), 'hg-debug-');
         $this->previousLog = (string)ini_get('error_log');
@@ -77,9 +77,9 @@ final class VerdictDebugLogTest extends AdapterTestCase
         $entry = $entries[0];
         self::assertTrue(wp_is_uuid($entry['request_id'], 4));
         self::assertSame('checkout', $entry['event']);
-        self::assertSame('development', $entry['environment']);
+        self::assertSame('production', $entry['environment']);
         self::assertSame('POST', $entry['method']);
-        self::assertSame('https://dev.hideguard.io/api/v1/verdict', $entry['url']);
+        self::assertSame('https://hideguard.io/api/v1/verdict', $entry['url']);
         self::assertSame(hash_hmac('sha256', 'fixture-visitor', wp_salt('auth')), $entry['visitor_hash']);
         self::assertSame($status, $entry['http_status']);
         self::assertGreaterThanOrEqual(0, $entry['duration_ms']);
@@ -185,7 +185,7 @@ final class VerdictDebugLogTest extends AdapterTestCase
             self::assertSame(1, $this->calls);
         }
         $values = $this->services->settings->values();
-        $values['keys']['development']['apiKey'] = '';
+        $values['keys']['apiKey'] = '';
         update_option(Settings::OPTION, $values);
         $next->backend()->assertAllowed('login');
         self::assertCount(1, $this->entries());
@@ -270,7 +270,7 @@ final class VerdictDebugLogTest extends AdapterTestCase
         $this->enable();
         $this->mock($this->response('allow'));
         $transport = new WordPressTransport();
-        $transport->post('https://dev.hideguard.io/api/v1/verdict', [], '{}');
+        $transport->post('https://hideguard.io/api/v1/verdict', [], '{}');
         $policy = $this->services->settings->policy();
         $throw = static fn() => throw new RuntimeException('fixture debug failure');
         add_filter('salt', $throw);

@@ -41,7 +41,7 @@ final class NetworkBootstrapTest extends HttpTestCase
     public function testNativeLoginPageAlsoReceivesTheEarlyQueue(): void
     {
         $values = (new Settings())->values();
-        $values['keys']['development']['apiKey'] = 'fixture-backend-key';
+        $values['keys']['apiKey'] = 'fixture-backend-key';
         update_option(Settings::OPTION, $values);
         [$status, $html] = $this->request('/wp-login.php');
         self::assertSame(200, $status);
