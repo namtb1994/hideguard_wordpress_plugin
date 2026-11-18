@@ -1,9 +1,9 @@
-# HideGuard Bot Protection for WordPress and WooCommerce
+# HideGuard Bot & Checkout Guard for WordPress
 
-[HideGuard](https://hideguard.io/) helps protect WordPress sites from bot traffic
-and abuse during WooCommerce checkout. It verifies browsers with signed verdicts
-and checks supported cart, order, payment, login and registration actions on the
-server.
+[HideGuard Bot & Checkout Guard](https://hideguard.io/) is a WordPress bot
+protection and WooCommerce checkout security plugin. It combines signed browser
+verification with server-side checks for public pages and supported cart,
+checkout, payment, login and registration actions.
 
 ## What HideGuard protects
 
